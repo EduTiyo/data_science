@@ -112,6 +112,73 @@ def fix_inconsistencies(df: pd.DataFrame, log: dict) -> pd.DataFrame:
     return df
 
 
+def missing_counts_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a DataFrame with missing counts per column.
+
+    Counts both NaN and empty-string as missing (consistent with notebook code).
+    """
+    rows = []
+    for c in df.columns:
+        cnt = int(df[c].replace('', pd.NA).isna().sum())
+        rows.append({'column': c, 'missing': cnt})
+    return pd.DataFrame(rows)
+
+
+def check_inconsistencies_df(df: pd.DataFrame) -> dict:
+    """Check inconsistencies where sum of component injured/killed > total.
+
+    Returns a dict like {'injured': n, 'killed': n} with counts of violating rows.
+    """
+    dfn = df.copy()
+    out = {}
+    # convert candidates to numeric where appropriate
+    for c in dfn.columns:
+        try:
+            dfn[c] = pd.to_numeric(dfn[c], errors='coerce')
+        except Exception:
+            # leave as-is if cannot coerce
+            pass
+
+    if 'number_of_persons_injured' in dfn.columns:
+        comp_inj = [c for c in dfn.columns if c.endswith('_injured') and c != 'number_of_persons_injured']
+        if comp_inj:
+            comp_sum = dfn[comp_inj].fillna(0).sum(axis=1)
+            total = dfn['number_of_persons_injured'].fillna(0)
+            mask = comp_sum > total
+            out['injured'] = int(mask.sum())
+
+    if 'number_of_persons_killed' in dfn.columns:
+        comp_kill = [c for c in dfn.columns if c.endswith('_killed') and c != 'number_of_persons_killed']
+        if comp_kill:
+            comp_sum_k = dfn[comp_kill].fillna(0).sum(axis=1)
+            total_k = dfn['number_of_persons_killed'].fillna(0)
+            maskk = comp_sum_k > total_k
+            out['killed'] = int(maskk.sum())
+
+    return out
+
+
+def plot_missing_heatmap(df: pd.DataFrame, title: str, sample_n: int = 2000):
+    """Plot a heatmap of missingness (sampled) using seaborn/matplotlib.
+
+    This function avoids heavy memory usage by sampling when df is large.
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    df2 = df.replace('', np.nan)
+    if len(df2) > sample_n:
+        df2 = df2.sample(sample_n, random_state=0)
+    m = df2.isnull().astype(int)
+    plt.figure(figsize=(14, max(6, 0.25 * len(m.columns))))
+    sns.heatmap(m.T, cbar=False, cmap='viridis')
+    plt.title(title)
+    plt.xlabel('amostra de linhas')
+    plt.ylabel('colunas')
+    plt.tight_layout()
+    plt.show()
+
+
 def main(limit: int = 5000, out_prefix: str = "cleaned"):
     log = {
         'run_timestamp': datetime.utcnow().isoformat() + 'Z',
