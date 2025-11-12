@@ -1,4 +1,4 @@
-name: ds_cleaning
+name: NYCrashes
 channels:
   - conda-forge
   - defaults
