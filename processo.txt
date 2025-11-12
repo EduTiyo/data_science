@@ -1,0 +1,69 @@
+================================================================================
+DOCUMENTAÇÃO DO PROCESSO DE LIMPEZA DE DADOS
+================================================================================
+Data de execução: 2025-11-12 18:28:25
+Arquivo de entrada: data.csv
+Arquivo de saída: cleaned_data.csv
+Tamanho do chunk: 200000 linhas
+================================================================================
+
+ESTRATÉGIAS E DECISÕES DE LIMPEZA
+--------------------------------------------------------------------------------
+
+1. PADRONIZAÇÃO DE FORMATOS:
+   - Datas (crash_date): Conversão para formato date usando pd.to_datetime
+   - Horários (crash_time): Tentativa de múltiplos formatos (HH:MM, HH:MM:SS)
+   - ZIP codes: Extração de dígitos, padronização para 5 caracteres
+   - Borough: Conversão para maiúsculas, remoção de espaços
+   DECISÃO: Manter valores originais + criar colunas padronizadas (_parsed, _std)
+
+2. TRATAMENTO DE VALORES AUSENTES:
+   - Colunas de contagem (injured, killed, etc.): Imputação com 0
+   JUSTIFICATIVA: Valores ausentes em contagens geralmente significam zero ocorrências
+   - Coordenadas (latitude, longitude): Conversão de zeros para NA
+   JUSTIFICATIVA: Coordenada (0,0) é inválida para NYC (Golfo da Guiné)
+
+3. DETECÇÃO E CORREÇÃO DE INCONSISTÊNCIAS:
+   - Dependências funcionais verificadas:
+     * number_of_persons_injured >= soma(pedestrian + cyclist + motorist injured)
+     * number_of_persons_killed >= soma(pedestrian + cyclist + motorist killed)
+   DECISÃO: Quando soma > total, ajustar total para refletir soma dos componentes
+   JUSTIFICATIVA: Componentes individuais são mais confiáveis que totais agregados
+
+4. DETECÇÃO E TRATAMENTO DE OUTLIERS:
+   - Método: Winsorization com percentis P1 e P99
+   - Valores abaixo de P1 são ajustados para P1
+   - Valores acima de P99 são ajustados para P99
+   - Valores originais são preservados em colunas *_outlier_orig
+   - Flag booleana criada: *_is_outlier
+   DECISÃO: Preservar distribuição enquanto limita extremos para análise
+   JUSTIFICATIVA: Valores extremos podem ser dados válidos ou erros
+
+================================================================================
+
+
+RESULTADOS DO PROCESSAMENTO
+================================================================================
+
+Total de chunks processados: 2
+Total de linhas processadas: 400,000
+
+ESTATÍSTICAS AGREGADAS:
+--------------------------------------------------------------------------------
+  • Datas convertidas: 400,000
+  • Horários convertidos: 400,000
+  • ZIP codes corrigidos: 382
+  • Valores imputados com 0: 662,798
+  • Inconsistências injured corrigidas: 52
+  • Inconsistências killed corrigidas: 174,179
+  • Outliers tratados: 11,236
+
+ARQUIVOS GERADOS:
+--------------------------------------------------------------------------------
+  • Dados limpos: cleaned_data.csv
+  • Log estruturado (JSON): cleaned_logs.json
+  • Documentação: processo.txt
+
+================================================================================
+Processo finalizado em: 2025-11-12 18:29:14
+================================================================================
