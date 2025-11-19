@@ -1,7 +1,7 @@
 ================================================================================
 DOCUMENTAÇÃO DO PROCESSO DE LIMPEZA DE DADOS
 ================================================================================
-Data de execução: 2025-11-12 18:28:25
+Data de execução: 2025-11-19 15:40:08
 Arquivo de entrada: data.csv
 Arquivo de saída: cleaned_data.csv
 Tamanho do chunk: 200000 linhas
@@ -52,11 +52,11 @@ ESTATÍSTICAS AGREGADAS:
 --------------------------------------------------------------------------------
   • Datas convertidas: 400,000
   • Horários convertidos: 400,000
-  • ZIP codes corrigidos: 382
+  • ZIP codes corrigidos: 0
   • Valores imputados com 0: 662,798
-  • Inconsistências injured corrigidas: 52
-  • Inconsistências killed corrigidas: 174,179
-  • Outliers tratados: 11,236
+  • Inconsistências injured corrigidas: 53
+  • Inconsistências killed corrigidas: 174,176
+  • Outliers tratados: 11,240
 
 ARQUIVOS GERADOS:
 --------------------------------------------------------------------------------
@@ -65,5 +65,5 @@ ARQUIVOS GERADOS:
   • Documentação: processo.txt
 
 ================================================================================
-Processo finalizado em: 2025-11-12 18:29:14
+Processo finalizado em: 2025-11-19 15:41:02
 ================================================================================
