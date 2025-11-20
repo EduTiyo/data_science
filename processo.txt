@@ -1,69 +1,88 @@
 ================================================================================
-DOCUMENTAÇÃO DO PROCESSO DE LIMPEZA DE DADOS
+DOCUMENTAÇÃO DO PROCESSO DE LIMPEZA DE DADOS (VERSÃO MELHORADA)
 ================================================================================
-Data de execução: 2025-11-19 15:40:08
+Data de execução: 2025-11-20 13:37:37
 Arquivo de entrada: data.csv
 Arquivo de saída: cleaned_data.csv
 Tamanho do chunk: 200000 linhas
 ================================================================================
 
-ESTRATÉGIAS E DECISÕES DE LIMPEZA
---------------------------------------------------------------------------------
-
-1. PADRONIZAÇÃO DE FORMATOS:
-   - Datas (crash_date): Conversão para formato date usando pd.to_datetime
-   - Horários (crash_time): Tentativa de múltiplos formatos (HH:MM, HH:MM:SS)
-   - ZIP codes: Extração de dígitos, padronização para 5 caracteres
-   - Borough: Conversão para maiúsculas, remoção de espaços
-   DECISÃO: Manter valores originais + criar colunas padronizadas (_parsed, _std)
-
-2. TRATAMENTO DE VALORES AUSENTES:
-   - Colunas de contagem (injured, killed, etc.): Imputação com 0
-   JUSTIFICATIVA: Valores ausentes em contagens geralmente significam zero ocorrências
-   - Coordenadas (latitude, longitude): Conversão de zeros para NA
-   JUSTIFICATIVA: Coordenada (0,0) é inválida para NYC (Golfo da Guiné)
-
-3. DETECÇÃO E CORREÇÃO DE INCONSISTÊNCIAS:
-   - Dependências funcionais verificadas:
-     * number_of_persons_injured >= soma(pedestrian + cyclist + motorist injured)
-     * number_of_persons_killed >= soma(pedestrian + cyclist + motorist killed)
-   DECISÃO: Quando soma > total, ajustar total para refletir soma dos componentes
-   JUSTIFICATIVA: Componentes individuais são mais confiáveis que totais agregados
-
-4. DETECÇÃO E TRATAMENTO DE OUTLIERS:
-   - Método: Winsorization com percentis P1 e P99
-   - Valores abaixo de P1 são ajustados para P1
-   - Valores acima de P99 são ajustados para P99
-   - Valores originais são preservados em colunas *_outlier_orig
-   - Flag booleana criada: *_is_outlier
-   DECISÃO: Preservar distribuição enquanto limita extremos para análise
-   JUSTIFICATIVA: Valores extremos podem ser dados válidos ou erros
-
-================================================================================
+AMOSTRAGEM ESTRATIFICADA (RESUMO)
+{
+  "sampled_rows": 400000,
+  "before_after_counts": {
+    "before": 200000,
+    "after": 200000
+  }
+}
 
 
 RESULTADOS DO PROCESSAMENTO
 ================================================================================
 
-Total de chunks processados: 2
-Total de linhas processadas: 400,000
-
-ESTATÍSTICAS AGREGADAS:
---------------------------------------------------------------------------------
-  • Datas convertidas: 400,000
-  • Horários convertidos: 400,000
-  • ZIP codes corrigidos: 0
-  • Valores imputados com 0: 662,798
-  • Inconsistências injured corrigidas: 53
-  • Inconsistências killed corrigidas: 174,176
-  • Outliers tratados: 11,240
+{
+  "chunks": 2,
+  "rows_processed": 399962,
+  "etapas": {
+    "padronizacao": {
+      "crash_date": {
+        "validas": 200000,
+        "falhas_conversao": 0
+      },
+      "crash_time": {
+        "validos": 0,
+        "falhas_conversao": 0
+      },
+      "zip_code": {
+        "invalidos_antes": 0,
+        "invalidos_depois": 0,
+        "corrigidos": 0
+      },
+      "borough": {
+        "vazios_antes": 259,
+        "vazios_depois": 259
+      }
+    },
+    "missing_values": {
+      "latitude": {
+        "antes": 4,
+        "zeros_detectados": 0,
+        "depois": 5
+      },
+      "longitude": {
+        "antes": 119,
+        "zeros_detectados": 0,
+        "depois": 199993
+      }
+    },
+    "inconsistencias": {},
+    "outliers": {},
+    "feature_engineering": {
+      "basic_feats_created": true,
+      "factors_grouped": true,
+      "geo_cluster": {
+        "n_clusters": 20
+      }
+    }
+  },
+  "errors": [],
+  "total_stats": {
+    "datas_convertidas": 399962,
+    "horarios_convertidos": 0,
+    "zips_corrigidos": 0,
+    "valores_imputados": 0,
+    "inconsistencias_injured_corrigidas": 0,
+    "inconsistencias_killed_corrigidas": 0,
+    "outliers_tratados": 0,
+    "rows_written": 399962
+  }
+}
 
 ARQUIVOS GERADOS:
---------------------------------------------------------------------------------
   • Dados limpos: cleaned_data.csv
   • Log estruturado (JSON): cleaned_logs.json
   • Documentação: processo.txt
 
 ================================================================================
-Processo finalizado em: 2025-11-19 15:41:02
+Processo finalizado em: 2025-11-20 13:38:29
 ================================================================================
