@@ -1,0 +1,71 @@
+{
+  "timestamp": "2025-11-25T00:25:00.211973",
+  "limit": 1200000,
+  "steps": [],
+  "count_columns": [
+    "number_of_persons_injured",
+    "number_of_persons_killed",
+    "number_of_pedestrians_injured",
+    "number_of_pedestrians_killed",
+    "number_of_cyclist_injured",
+    "number_of_cyclist_killed",
+    "number_of_motorist_injured",
+    "number_of_motorist_killed"
+  ],
+  "removed_impossible_values": {
+    "number_of_persons_injured": 0,
+    "number_of_persons_killed": 0,
+    "number_of_pedestrians_injured": 0,
+    "number_of_pedestrians_killed": 0,
+    "number_of_cyclist_injured": 0,
+    "number_of_cyclist_killed": 0,
+    "number_of_motorist_injured": 0,
+    "number_of_motorist_killed": 0
+  },
+  "inconsistency_fixes": {
+    "injured_rows_fixed": 95,
+    "killed_rows_fixed": 5
+  },
+  "winsorized": {
+    "number_of_persons_injured": {
+      "p1": 0.0,
+      "p99": 3.0,
+      "n_outliers": 8987
+    },
+    "number_of_persons_killed": {
+      "p1": 0.0,
+      "p99": 0.0,
+      "n_outliers": 1976
+    },
+    "number_of_pedestrians_injured": {
+      "p1": 0.0,
+      "p99": 1.0,
+      "n_outliers": 2562
+    },
+    "number_of_pedestrians_killed": {
+      "p1": 0.0,
+      "p99": 0.0,
+      "n_outliers": 945
+    },
+    "number_of_cyclist_injured": {
+      "p1": 0.0,
+      "p99": 1.0,
+      "n_outliers": 535
+    },
+    "number_of_cyclist_killed": {
+      "p1": 0.0,
+      "p99": 0.0,
+      "n_outliers": 174
+    },
+    "number_of_motorist_injured": {
+      "p1": 0.0,
+      "p99": 3.0,
+      "n_outliers": 8782
+    },
+    "number_of_motorist_killed": {
+      "p1": 0.0,
+      "p99": 0.0,
+      "n_outliers": 812
+    }
+  }
+}

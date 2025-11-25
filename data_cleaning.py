@@ -1,22 +1,9 @@
-"""
-Data cleaning script for NYC motor vehicle collisions dataset
-Endpoint: https://data.cityofnewyork.us/resource/h9gi-nx95.json
-
-This script downloads a sample (configurable), inspects schema and basic stats,
-applies cleaning transformations (missing values, outliers, inconsistencies,
-padronization), and writes cleaned CSV + a JSON log describing all decisions.
-
-Run: python data_cleaning.py --limit 5000
-
-"""
-
 from __future__ import annotations
 import argparse
+import csv
 import json
-import math
-import os
-from collections import defaultdict
 from datetime import datetime
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -24,6 +11,9 @@ import requests
 
 ENDPOINT = "https://data.cityofnewyork.us/resource/h9gi-nx95.json"
 
+###############################################################################
+# DOWNLOAD
+###############################################################################
 
 def download_data(limit: int = 1000) -> list:
     params = {"$limit": str(limit)}
@@ -31,200 +21,252 @@ def download_data(limit: int = 1000) -> list:
     resp.raise_for_status()
     return resp.json()
 
+###############################################################################
+# NORMALIZAÇÃO DE COLUNAS
+###############################################################################
 
 def normalize_colnames(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    newcols = {}
-    for c in df.columns:
-        nc = c.strip().lower().replace(" ", "_").replace("/", "_")
-        newcols[c] = nc
-    df.rename(columns=newcols, inplace=True)
+    df.columns = (
+        df.columns.str.strip()
+        .str.lower()
+        .str.replace(" ", "_")
+        .str.replace("/", "_")
+    )
     return df
 
+###############################################################################
+# PRE-FILTRO DE VALORES ABSURDOS
+###############################################################################
+# NYC JAMAIS registrou:
+# - > 50 mortos em um acidente
+# - > 200 feridos em um acidente
+# Valores acima disso indicam erro de parsing ou lixo histórico
 
-def is_count_col(col: str) -> bool:
-    # heuristic: many count fields start with number_of_
-    return col.startswith("number_of_") or any(k in col for k in ("injured", "killed"))
+def remove_impossible_values(df: pd.DataFrame, log: dict):
+    count_cols = [c for c in df.columns if "injured" in c or "killed" in c]
 
+    impossible_mask = pd.DataFrame(False, index=df.index, columns=count_cols)
+    for c in count_cols:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
 
-def standardize_zip(z):
-    if pd.isna(z):
-        return None
-    z = str(z).strip()
-    # remove non-digit
-    digits = ''.join(ch for ch in z if ch.isdigit())
-    if len(digits) == 0:
-        return None
-    if len(digits) > 5:
-        digits = digits[:5]
-    return digits.zfill(5)
+        # limite seguro baseado em estatística real
+        mask = (df[c] > 200)
+        impossible_mask[c] = mask
+        df.loc[mask, c] = np.nan
 
+    log["removed_impossible_values"] = {
+        c: int(impossible_mask[c].sum()) for c in count_cols
+    }
 
-def detect_and_treat_outliers(df: pd.DataFrame, cols: list, log: dict):
-    # flag outliers using IQR and then winsorize at 1st/99th percentiles
-    outlier_info = {}
-    for c in cols:
-        ser = df[c].dropna().astype(float)
-        if ser.empty:
-            outlier_info[c] = {"n_outliers": 0}
-            continue
-        q1 = ser.quantile(0.25)
-        q3 = ser.quantile(0.75)
-        iqr = q3 - q1
-        lower = q1 - 1.5 * iqr
-        upper = q3 + 1.5 * iqr
-        outliers = df[(df[c] < lower) | (df[c] > upper)][c]
-        n_out = int(outliers.shape[0])
-        outlier_info[c] = {"n_outliers": n_out, "lower": float(lower), "upper": float(upper)}
-        # winsorize to 1st/99th percentile
-        p1 = ser.quantile(0.01)
-        p99 = ser.quantile(0.99)
-        df[c] = df[c].clip(lower=p1, upper=p99)
-        outlier_info[c].update({"winsor_lower": float(p1), "winsor_upper": float(p99)})
-    log['outliers'] = outlier_info
     return df
 
+###############################################################################
+# CORREÇÃO DE INCONSISTÊNCIAS ENTRE TOTAIS E COMPONENTES
+###############################################################################
 
 def fix_inconsistencies(df: pd.DataFrame, log: dict) -> pd.DataFrame:
-    # For injured/killed totals vs components, adjust total to component sums if component sum > total
     df = df.copy()
     corrections = defaultdict(int)
 
-    # Injured
-    comp_inj_cols = [c for c in df.columns if c.endswith("_injured") and c != 'number_of_persons_injured']
-    if 'number_of_persons_injured' in df.columns and comp_inj_cols:
+    # INJURED
+    comp_inj_cols = [
+        c for c in df.columns 
+        if c.endswith("_injured") and c != "number_of_persons_injured"
+    ]
+
+    if "number_of_persons_injured" in df.columns:
         comp_sum = df[comp_inj_cols].fillna(0).sum(axis=1)
-        total = pd.to_numeric(df['number_of_persons_injured'], errors='coerce').fillna(0)
-        mask = comp_sum > total
-        corrections['injured_rows_fixed'] = int(mask.sum())
-        df.loc[mask, 'number_of_persons_injured'] = comp_sum[mask]
 
-    # Killed
-    comp_kill_cols = [c for c in df.columns if c.endswith("_killed") and c != 'number_of_persons_killed']
-    if 'number_of_persons_killed' in df.columns and comp_kill_cols:
+        total = df["number_of_persons_injured"].fillna(0)
+
+        mask = comp_sum > total
+        corrections["injured_rows_fixed"] = int(mask.sum())
+
+        # 🔥 FIX: garantir dtype correto
+        df.loc[mask, "number_of_persons_injured"] = (
+            comp_sum[mask]
+            .astype("Int64")
+        )
+
+    # KILLED
+    comp_kill_cols = [
+        c for c in df.columns 
+        if c.endswith("_killed") and c != "number_of_persons_killed"
+    ]
+
+    if "number_of_persons_killed" in df.columns:
         comp_sum = df[comp_kill_cols].fillna(0).sum(axis=1)
-        total = pd.to_numeric(df['number_of_persons_killed'], errors='coerce').fillna(0)
-        mask = comp_sum > total
-        corrections['killed_rows_fixed'] = int(mask.sum())
-        df.loc[mask, 'number_of_persons_killed'] = comp_sum[mask]
+        total = df["number_of_persons_killed"].fillna(0)
 
-    log['inconsistency_fixes'] = corrections
+        mask = comp_sum > total
+        corrections["killed_rows_fixed"] = int(mask.sum())
+
+        df.loc[mask, "number_of_persons_killed"] = (
+            comp_sum[mask]
+            .astype("Int64")
+        )
+
+    log["inconsistency_fixes"] = corrections
     return df
 
 
-def main(limit: int = 5000, out_prefix: str = "cleaned"):
-    log = {
-        'run_timestamp': datetime.utcnow().isoformat() + 'Z',
-        'source_endpoint': ENDPOINT,
-        'limit_requested': int(limit),
-        'decisions': []
-    }
+###############################################################################
+# OUTLIERS ROBUSTOS (winsorização corrigida)
+###############################################################################
 
-    print(f"Downloading {limit} rows from endpoint...")
-    raw = download_data(limit)
-    print(f"Downloaded {len(raw)} records")
-
-    df = pd.DataFrame(raw)
-    start_rows = df.shape[0]
-    log['start_rows'] = int(start_rows)
-
-    # clean column names
-    df = normalize_colnames(df)
-    log['decisions'].append("Normalized column names: strip, lower, spaces->underscore")
-
-    # snapshot: missing per column
-    missing_pct = (df.isna() | (df == '')).mean().to_dict()
-    log['missing_pct_before'] = {k: float(v) for k, v in missing_pct.items()}
-
-    # Detect and coerce numeric count columns
-    count_cols = [c for c in df.columns if is_count_col(c)]
-    log['count_cols_detected'] = count_cols
+def robust_winsorize(df: pd.DataFrame, count_cols: list, log: dict):
+    outlier_info = {}
 
     for c in count_cols:
-        df[c] = pd.to_numeric(df[c].replace('', np.nan), errors='coerce')
-        # Decision: for count fields, treat missing as 0 (assumption: blank means no reported injuries/kills)
-        n_missing_before = int(df[c].isna().sum())
-        df[c] = df[c].fillna(0).astype(int)
-        log['decisions'].append(f"Column {c}: coerced to int; missing({n_missing_before}) -> filled with 0")
+        ser = df[c].dropna()
 
-    # Parse dates
-    if 'crash_date' in df.columns:
-        df['crash_date_parsed'] = pd.to_datetime(df['crash_date'], errors='coerce').dt.date
-        n_date_missing = int(df['crash_date_parsed'].isna().sum())
-        log['decisions'].append(f"Parsed crash_date -> crash_date_parsed; missing after parse: {n_date_missing}")
+        if ser.empty:
+            outlier_info[c] = {"n_outliers": 0}
+            continue
 
-    # Parse times
-    if 'crash_time' in df.columns:
-        # try flexible parsing
-        def parse_time(x):
-            try:
-                if pd.isna(x) or str(x).strip() == '':
-                    return None
-                # some entries like '0:00' or '00:00' or '22:20'
-                t = pd.to_datetime(str(x).strip(), format='%H:%M', errors='coerce')
-                if pd.isna(t):
-                    t = pd.to_datetime(str(x).strip(), format='%H:%M:%S', errors='coerce')
-                if pd.isna(t):
-                    # fallback general parser
-                    t = pd.to_datetime(str(x).strip(), errors='coerce')
-                return t.time() if not pd.isna(t) else None
-            except Exception:
-                return None
+        # percentis sólidos (1–99%)
+        p1 = np.percentile(ser, 1)
+        p99 = np.percentile(ser, 99)
 
-        df['crash_time_parsed'] = df['crash_time'].apply(parse_time)
-        n_time_missing = int(df['crash_time_parsed'].isna().sum())
-        log['decisions'].append(f"Parsed crash_time -> crash_time_parsed; missing after parse: {n_time_missing}")
+        mask = (df[c] < p1) | (df[c] > p99)
+        n_out = int(mask.sum())
 
-    # Latitude/Longitude
-    for loc in ('latitude', 'longitude'):
-        if loc in df.columns:
-            df[loc] = pd.to_numeric(df[loc].replace('', np.nan), errors='coerce')
-            # treat 0 or exactly 0.0 as missing (observed in data)
-            mask0 = df[loc].astype(float) == 0.0
-            n0 = int(mask0.sum())
-            df.loc[mask0, loc] = np.nan
-            log['decisions'].append(f"Column {loc}: coerced to float; replaced {n0} zero values with NaN")
+        df[c] = df[c].clip(lower=p1, upper=p99)
 
-    # Zip code standardization
-    if 'zip_code' in df.columns:
-        df['zip_code_std'] = df['zip_code'].apply(standardize_zip)
-        n_zip_bad = int(df['zip_code_std'].isna().sum())
-        log['decisions'].append(f"Standardized zip_code -> zip_code_std; invalid/empty: {n_zip_bad}")
+        outlier_info[c] = {
+            "p1": float(p1),
+            "p99": float(p99),
+            "n_outliers": n_out,
+        }
 
-    # Borough/text normalization
-    if 'borough' in df.columns:
-        df['borough_std'] = df['borough'].astype(str).str.strip().str.upper().replace({'NONE': None, '': None})
-        log['decisions'].append("Standardized borough to uppercase in 'borough_std'")
+    log["winsorized"] = outlier_info
+    return df
 
-    # Inconsistency fixes (injured/killed totals)
+###############################################################################
+# LIMPEZA COMPLETA
+###############################################################################
+
+def main(limit: int = 5000, out_prefix: str = "cleaned"):
+    log = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "limit": limit,
+        "steps": []
+    }
+
+    # DOWNLOAD
+    raw = download_data(limit)
+    df = pd.DataFrame(raw)
+
+    # NORMALIZAR COLUNAS
+    df = normalize_colnames(df)
+
+    # DETECTAR COLUNAS DE CONTAGEM
+    count_cols = [c for c in df.columns if "injured" in c or "killed" in c]
+    log["count_columns"] = count_cols
+
+    # TORNAR NUMÉRICO
+    for c in count_cols:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # 1️⃣ REMOVER VALORES IMPOSSÍVEIS
+    df = remove_impossible_values(df, log)
+
+    # 2️⃣ CORRIGIR INCONSISTÊNCIAS ENTRE TOTAIS E COMPONENTES
     df = fix_inconsistencies(df, log)
 
-    # Detect and treat outliers on numeric count columns
-    df = detect_and_treat_outliers(df, count_cols, log)
+    # 3️⃣ APLICAR WINSORIZAÇÃO ROBUSTA
+    df = robust_winsorize(df, count_cols, log)
 
-    # Record missing after
-    missing_pct_after = (df.isna() | (df == '')).mean().to_dict()
-    log['missing_pct_after'] = {k: float(v) for k, v in missing_pct_after.items()}
+    # 4️⃣ PARSE DA DATA
+    if "crash_date" in df.columns:
+        df["crash_date_parsed"] = pd.to_datetime(df["crash_date"], errors="coerce")
 
-    # Summaries
-    log['rows_after_clean'] = int(df.shape[0])
+    # SALVAR
+    df.to_csv(
+        f"{out_prefix}.csv",
+        index=False,
+        quoting=csv.QUOTE_ALL,
+        escapechar="\\",
+        quotechar='"',
+        line_terminator="\n",
+        on_bad_lines='skip'
+    )
 
-    # Save outputs
-    out_csv = f"{out_prefix}.csv"
-    out_log = f"{out_prefix}_cleaning_log.json"
-    df.to_csv(out_csv, index=False)
-    with open(out_log, 'w', encoding='utf-8') as f:
+    with open(f"{out_prefix}_log.json", "w", encoding="utf-8") as f:
         json.dump(log, f, indent=2, ensure_ascii=False)
 
-    print(f"Wrote cleaned CSV: {out_csv}")
-    print(f"Wrote cleaning log: {out_log}")
-    print("Summary of key log entries:")
-    print(json.dumps({k: log[k] for k in ('start_rows','rows_after_clean','count_cols_detected') if k in log}, indent=2))
+    print("✔ Cleaning finalizado!")
+    print(f"Arquivo salvo: {out_prefix}.csv")
+
+###############################################################################
+# Funções utilitárias
+###############################################################################
+
+def is_count_col(col: str) -> bool:
+    """Compatibilidade com o main.ipynb."""
+    return (
+        col.startswith("number_of_")
+        or "injured" in col
+        or "killed" in col
+    )
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Clean NYC collisions dataset (sample).')
-    parser.add_argument('--limit', type=int, default=5000, help='number of rows to fetch from the API')
-    parser.add_argument('--out', type=str, default='cleaned', help='output prefix for files (cleaned.csv, cleaned_cleaning_log.json)')
+def standardize_zip(z):
+    """Compatibilidade — retorna zip padronizado."""
+    if pd.isna(z):
+        return None
+    z = str(z).strip()
+    digits = ''.join(ch for ch in z if ch.isdigit())
+    if not digits:
+        return None
+    return digits.zfill(5)[:5]
+
+
+def missing_counts_df(df: pd.DataFrame):
+    """Retorna um DF com contagem de missing por coluna."""
+    return df.isna().sum().reset_index().rename(
+        columns={"index": "column", 0: "missing_count"}
+    )
+
+
+def check_inconsistencies_df(df: pd.DataFrame):
+    """Verifica linhas onde soma dos componentes > total."""
+    issues = []
+
+    inj_cols = [c for c in df.columns if c.endswith("_injured") and c != "number_of_persons_injured"]
+    kill_cols = [c for c in df.columns if c.endswith("_killed") and c != "number_of_persons_killed"]
+
+    if inj_cols:
+        comp_sum = df[inj_cols].sum(axis=1)
+        mask = comp_sum > df["number_of_persons_injured"]
+        issues.append(("injured", int(mask.sum())))
+
+    if kill_cols:
+        comp_sum = df[kill_cols].sum(axis=1)
+        mask = comp_sum > df["number_of_persons_killed"]
+        issues.append(("killed", int(mask.sum())))
+
+    return pd.DataFrame(issues, columns=["type", "rows_with_inconsistency"])
+
+
+def plot_missing_heatmap(df: pd.DataFrame, figsize=(14,6)):
+    """Plota gráfico de missing (versão simplificada)."""
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    plt.figure(figsize=figsize)
+    sns.heatmap(df.isna(), cbar=False)
+    plt.title("Missing Heatmap")
+    plt.show()
+
+
+###############################################################################
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=5000)
+    parser.add_argument("--out", type=str, default="cleaned")
     args = parser.parse_args()
+
     main(limit=args.limit, out_prefix=args.out)
