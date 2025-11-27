@@ -1,7 +1,7 @@
 ================================================================================
 DOCUMENTAÇÃO DO PROCESSO DE LIMPEZA DE DADOS
 ================================================================================
-Data de execução: 2025-11-25 08:50:04
+Data de execução: 2025-11-27 14:33:39
 Arquivo de entrada: raw_full.csv
 Arquivo de saída: cleaned_data.csv
 Tamanho do chunk: 200000 linhas
@@ -46,17 +46,17 @@ RESULTADOS DO PROCESSAMENTO
 ================================================================================
 
 Total de chunks processados: 12
-Total de linhas processadas: 2,222,829
+Total de linhas processadas: 2,223,272
 
 ESTATÍSTICAS AGREGADAS:
 --------------------------------------------------------------------------------
-  • Datas convertidas: 2,222,829
-  • Horários convertidos: 2,222,829
-  • ZIP codes corrigidos: 291,643
-  • Valores imputados com 0: 7,097,609
-  • Inconsistências injured corrigidas: 26,945
-  • Inconsistências killed corrigidas: 698,977
-  • Outliers tratados: 116,468
+  • Datas convertidas: 2,223,272
+  • Horários convertidos: 2,223,272
+  • ZIP codes corrigidos: 199,590
+  • Valores imputados com 0: 7,484,934
+  • Inconsistências injured corrigidas: 20,886
+  • Inconsistências killed corrigidas: 563,446
+  • Outliers tratados: 104,326
 
 ARQUIVOS GERADOS:
 --------------------------------------------------------------------------------
@@ -65,5 +65,5 @@ ARQUIVOS GERADOS:
   • Documentação: processo.txt
 
 ================================================================================
-Processo finalizado em: 2025-11-25 08:57:36
+Processo finalizado em: 2025-11-27 14:36:14
 ================================================================================

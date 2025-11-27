@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
+import re
 
 import pandas as pd
 import json
@@ -113,6 +114,129 @@ def _resolve_vehicle_columns(df: pd.DataFrame) -> List[Tuple[int, str, str]]:
     return available
 
 
+def _strip_outlier_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove colunas auxiliares criadas na winsorização."""
+    return df[[c for c in df.columns if not c.endswith("_outlier_orig")]]
+
+
+def _clean_collision_id(df: pd.DataFrame) -> pd.DataFrame:
+    """Padroniza collision_id e remove registros inválidos."""
+    df = df.copy()
+    df["collision_id"] = df["collision_id"].astype(str)
+    valid = df["collision_id"].str.fullmatch(r"[1-9][0-9]*")
+    return df[valid].copy()
+
+
+def _sanitize_counts(df: pd.DataFrame) -> pd.DataFrame:
+    """Torna colunas de contagem numéricas e limita valores extremos."""
+    df = df.copy()
+    count_cols = [
+        col
+        for col in df.columns
+        if col.startswith("number_of_")
+        and (col.endswith("injured") or col.endswith("killed"))
+    ]
+    for col in count_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+        limit = 50 if col.endswith("killed") else 200
+        bad = (df[col] < 0) | (df[col] > limit)
+        df.loc[bad, col] = pd.NA
+    return df
+
+
+def _add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Cria colunas derivadas de data/hora para análises SQL e visuais."""
+    df = df.copy()
+
+    crash_date_series = df.get("crash_date_parsed", df.get("crash_date"))
+    crash_time_series = df.get("crash_time_parsed", df.get("crash_time"))
+
+    df["crash_date"] = pd.to_datetime(crash_date_series, errors="coerce")
+    df["crash_time"] = crash_time_series
+
+    df["crash_datetime"] = pd.to_datetime(
+        df["crash_date"].astype(str) + " " + df["crash_time"].astype(str),
+        errors="coerce",
+    )
+    df["crash_year"] = df["crash_datetime"].dt.year
+    df["crash_month"] = df["crash_datetime"].dt.month
+    df["crash_hour"] = df["crash_datetime"].dt.hour
+    df["crash_dow"] = df["crash_datetime"].dt.day_name()
+
+    def _period(hour: float) -> str:
+        if pd.isna(hour):
+            return "unknown"
+        hour = int(hour)
+        if 5 <= hour < 12:
+            return "morning"
+        if 12 <= hour < 18:
+            return "afternoon"
+        if 18 <= hour < 24:
+            return "evening"
+        return "night"
+
+    df["period_of_day"] = df["crash_hour"].apply(_period)
+    return df
+
+
+def _clean_contributing_factor(factor: object, vehicle_type: object) -> str | None:
+    """Sanitiza fator contribuinte removendo lixos (nulos, numéricos, ruas, tipos de veículo)."""
+    if pd.isna(factor):
+        return None
+
+    raw = str(factor).strip()
+    if raw == "":
+        return None
+
+    low = raw.lower()
+    if low in {"unspecified", "unknown", "nan", "none", "null", "0", "na", "n/a"}:
+        return None
+
+    # remove registros que são apenas números
+    if re.fullmatch(r"[0-9]+(?:\\.[0-9]+)?", raw):
+        return None
+
+    # descarta valores que parecem nomes de via
+    upper = raw.upper()
+    street_tokens = [" AVENUE", " AVE", " STREET", " ST ", " BROADWAY", " HIGHWAY", " HWY", " RD", " ROAD"]
+    if any(tok in upper for tok in street_tokens):
+        return None
+
+    # se o fator for igual ao tipo de veículo, provavelmente é ruído
+    if vehicle_type is not None:
+        vt = str(vehicle_type).strip().lower()
+        if vt and vt == low:
+            return None
+
+    # descarta fatores que são na verdade tipo de veículo
+    vehicle_tokens = {
+        "sedan",
+        "taxi",
+        "station wagon",
+        "sport utility vehicle",
+        "suv",
+        "van",
+        "minivan",
+        "pickup",
+        "pick-up",
+        "truck",
+        "box truck",
+        "flat bed",
+        "bus",
+        "school bus",
+        "bike",
+        "bicycle",
+        "motorcycle",
+        "scooter",
+    }
+    if low in vehicle_tokens:
+        return None
+    if any(tok in low for tok in vehicle_tokens):
+        return None
+
+    return raw
+
+
 # ---------------------------------------------------------------------------
 #   TABELA PRINCIPAL DE COLISÕES
 # ---------------------------------------------------------------------------
@@ -125,9 +249,15 @@ def build_collisions_table(df: pd.DataFrame) -> pd.DataFrame:
 
     collisions_cols = [
         "collision_id",
-        "crash_date_parsed",
-        "crash_time_parsed",
+        "crash_date",
+        "crash_datetime",
+        "crash_year",
+        "crash_month",
+        "crash_hour",
+        "period_of_day",
+        "borough",
         "borough_std",
+        "zip_code",
         "zip_code_std",
         "latitude",
         "longitude",
@@ -136,35 +266,35 @@ def build_collisions_table(df: pd.DataFrame) -> pd.DataFrame:
         "off_street_name",
         "number_of_persons_injured",
         "number_of_persons_killed",
+        "number_of_pedestrians_injured",
+        "number_of_pedestrians_killed",
+        "number_of_cyclist_injured",
+        "number_of_cyclist_killed",
+        "number_of_motorist_injured",
+        "number_of_motorist_killed",
     ]
 
     available_cols = [col for col in collisions_cols if col in df.columns]
-
     collisions = df[available_cols].copy()
 
-    rename_map = {
-        "crash_date_parsed": "crash_date",
-        "crash_time_parsed": "crash_time",
-        "borough_std": "borough",
-        "zip_code_std": "zip_code",
-    }
-    collisions.rename(columns=rename_map, inplace=True)
+    if "borough_std" in collisions.columns:
+        collisions["borough"] = collisions.pop("borough_std")
+    if "zip_code_std" in collisions.columns:
+        collisions["zip_code"] = collisions.pop("zip_code_std")
 
     collisions["collision_id"] = collisions["collision_id"].astype(str)
-
-    if "crash_date" in collisions.columns and "crash_time" in collisions.columns:
-        collisions["crash_datetime"] = pd.to_datetime(
-            collisions["crash_date"].astype(str)
-            + " "
-            + collisions["crash_time"].astype(str),
-            errors="coerce",
-        )
-        collisions.drop(columns=["crash_time"], inplace=True)
+    collisions["is_fatal"] = collisions["number_of_persons_killed"].fillna(0) > 0
+    collisions["people_injured_total"] = collisions["number_of_persons_injured"]
+    collisions["people_killed_total"] = collisions["number_of_persons_killed"]
 
     final_cols = [
         "collision_id",
         "crash_date",
         "crash_datetime",
+        "crash_year",
+        "crash_month",
+        "crash_hour",
+        "period_of_day",
         "borough",
         "zip_code",
         "latitude",
@@ -174,10 +304,18 @@ def build_collisions_table(df: pd.DataFrame) -> pd.DataFrame:
         "cross_street_name",
         "number_of_persons_injured",
         "number_of_persons_killed",
+        "number_of_pedestrians_injured",
+        "number_of_pedestrians_killed",
+        "number_of_cyclist_injured",
+        "number_of_cyclist_killed",
+        "number_of_motorist_injured",
+        "number_of_motorist_killed",
+        "is_fatal",
+        "people_injured_total",
+        "people_killed_total",
     ]
     final_cols = [c for c in final_cols if c in collisions.columns]
     collisions = collisions[final_cols]
-
     return collisions
 
 
@@ -189,21 +327,28 @@ def build_collisions_table(df: pd.DataFrame) -> pd.DataFrame:
 def build_participant_outcomes(df: pd.DataFrame) -> pd.DataFrame:
     """Gera tabela tidy com contagens de feridos/mortos por tipo de participante."""
 
-    # Remove colunas com valores pré-winsorização
-    df = df[[c for c in df.columns if not c.endswith("_outlier_orig")]]
+    df = _strip_outlier_columns(df)
 
-    # Seleciona apenas colunas oficiais e reais
     count_cols = [
         col
         for col in df.columns
-        if col.startswith("number_of_") and not col.endswith("_outlier_orig")
+        if col.startswith("number_of_") and not col.endswith("_is_outlier")
     ]
 
-    id_vars = [
-        col
-        for col in ["collision_id", "crash_date_parsed", "crash_time_parsed", "borough_std"]
-        if col in df.columns
+    id_candidates = [
+        "collision_id",
+        "crash_date",
+        "crash_datetime",
+        "crash_year",
+        "crash_month",
+        "crash_hour",
+        "period_of_day",
+        "borough_std",
+        "borough",
     ]
+    id_vars = [col for col in id_candidates if col in df.columns]
+    if "borough_std" in id_vars and "borough" in id_vars:
+        id_vars.remove("borough")
 
     melted = df[id_vars + count_cols].melt(
         id_vars=id_vars,
@@ -216,7 +361,7 @@ def build_participant_outcomes(df: pd.DataFrame) -> pd.DataFrame:
         if pd.isna(val):
             return 0
         try:
-            return int(float(val))
+            return max(int(float(val)), 0)
         except Exception:
             return 0
 
@@ -248,27 +393,17 @@ def build_participant_outcomes(df: pd.DataFrame) -> pd.DataFrame:
     melted["injury_outcome"] = parsed.apply(lambda x: x[1])
     melted.drop(columns=["metric"], inplace=True)
 
-    rename_map = {
-        "crash_date_parsed": "crash_date",
-        "crash_time_parsed": "crash_time",
-        "borough_std": "borough",
-    }
-    melted.rename(columns=rename_map, inplace=True)
-
     melted["collision_id"] = melted["collision_id"].astype(str)
-
-    if "crash_date" in melted.columns and "crash_time" in melted.columns:
-        melted["crash_datetime"] = pd.to_datetime(
-            melted["crash_date"].astype(str)
-            + " "
-            + melted["crash_time"].astype(str),
-            errors="coerce",
-        )
+    melted = melted.rename(columns={"borough_std": "borough"})
 
     final_cols = [
         "collision_id",
         "crash_date",
         "crash_datetime",
+        "crash_year",
+        "crash_month",
+        "crash_hour",
+        "period_of_day",
         "borough",
         "participant_type",
         "injury_outcome",
@@ -276,7 +411,26 @@ def build_participant_outcomes(df: pd.DataFrame) -> pd.DataFrame:
     ]
     final_cols = [c for c in final_cols if c in melted.columns]
 
-    melted = melted[final_cols]
+    melted = melted[melted["participant_type"] != "all_persons"]
+
+    melted = (
+        melted.groupby(
+            [
+                "collision_id",
+                "participant_type",
+                "injury_outcome",
+                "crash_datetime",
+                "crash_year",
+                "crash_month",
+                "crash_hour",
+                "period_of_day",
+                "borough",
+            ],
+            as_index=False,
+        )["people_count"]
+        .max()
+    )
+
     return melted
 
 
@@ -285,13 +439,25 @@ def build_participant_outcomes(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def build_vehicle_table(df: pd.DataFrame) -> pd.DataFrame:
-
-    df = df[[c for c in df.columns if not c.endswith("_outlier_orig")]]
+    """Normaliza informações de veículos e fatores contribuintes."""
+    df = _strip_outlier_columns(df)
 
     available = _resolve_vehicle_columns(df)
     records: List[pd.DataFrame] = []
-    base_cols = ["collision_id", "crash_date_parsed", "crash_time_parsed"]
+    base_cols = [
+        "collision_id",
+        "crash_date",
+        "crash_datetime",
+        "crash_year",
+        "crash_month",
+        "crash_hour",
+        "period_of_day",
+        "borough",
+        "borough_std",
+    ]
     base_cols = [c for c in base_cols if c in df.columns]
+    if "borough_std" in base_cols and "borough" in base_cols:
+        base_cols.remove("borough")
 
     for idx, vehicle_col, factor_col in available:
         temp = df[base_cols].copy()
@@ -300,42 +466,22 @@ def build_vehicle_table(df: pd.DataFrame) -> pd.DataFrame:
         temp["vehicle_type"] = df.get(vehicle_col, pd.NA)
         temp["contributing_factor"] = df.get(factor_col, pd.NA)
         temp["vehicle_index"] = idx
-
         records.append(temp)
 
     if not records:
         return pd.DataFrame()
 
     vehicles = pd.concat(records, ignore_index=True)
+    vehicles.rename(columns={"borough_std": "borough"}, inplace=True)
 
-    rename_map = {
-        "crash_date_parsed": "crash_date",
-        "crash_time_parsed": "crash_time",
-    }
-    vehicles.rename(columns=rename_map, inplace=True)
-
-    if "crash_date" in vehicles.columns and "crash_time" in vehicles.columns:
-        vehicles["crash_datetime"] = pd.to_datetime(
-            vehicles["crash_date"].astype(str)
-            + " "
-            + vehicles["crash_time"].astype(str),
-            errors="coerce",
-        )
-
-    final_cols = [
-        "collision_id",
-        "vehicle_index",
-        "vehicle_type",
-        "contributing_factor",
-        "crash_date",
-        "crash_datetime",
-    ]
-    final_cols = [c for c in final_cols if c in vehicles.columns]
-
-    vehicles = vehicles[final_cols]
-    vehicles = vehicles.dropna(
-        subset=["vehicle_type", "contributing_factor"], how="all"
+    # limpa fatores inválidos (numéricos, vias, iguais ao tipo de veículo, nulos)
+    vehicles["contributing_factor"] = vehicles.apply(
+        lambda row: _clean_contributing_factor(row["contributing_factor"], row.get("vehicle_type")),
+        axis=1,
     )
+
+    vehicles = vehicles.dropna(subset=["contributing_factor"], how="any")
+    vehicles = vehicles.drop_duplicates()
     vehicles.reset_index(drop=True, inplace=True)
     return vehicles
 
@@ -357,14 +503,16 @@ def run_pipeline(
         raise FileNotFoundError(f"Arquivo de entrada não encontrado: {cleaned_csv_path}")
 
     df = pd.read_csv(cleaned_csv_path, low_memory=False)
+    df.columns = df.columns.str.strip().str.lower()
 
-    # Remover colunas *_outlier_orig de uma vez
-    df = df[[c for c in df.columns if not c.endswith("_outlier_orig")]]
+    df = _clean_collision_id(df)
+    df = _strip_outlier_columns(df)
+    df = _sanitize_counts(df)
+    df = _add_temporal_features(df)
 
     collisions = build_collisions_table(df)
     participant_outcomes = build_participant_outcomes(df)
-    # vehicles = build_vehicle_table(df)
-    vehicles = pd.DataFrame()  # IGNORE
+    vehicles = build_vehicle_table(df)
 
     artifacts = TidyDataArtifacts(
         collisions=collisions,

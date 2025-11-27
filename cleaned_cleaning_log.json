@@ -1,0 +1,162 @@
+{
+  "run_timestamp": "2025-11-27T20:55:36.841853Z",
+  "source_endpoint": "https://data.cityofnewyork.us/resource/h9gi-nx95.json",
+  "limit_requested": 2250000,
+  "decisions": [
+    "Normalized column names: strip, lower, spaces->underscore",
+    "Column number_of_persons_injured: coerced to int; missing(18) -> filled with 0",
+    "Column number_of_persons_killed: coerced to int; missing(31) -> filled with 0",
+    "Column number_of_pedestrians_injured: coerced to int; missing(0) -> filled with 0",
+    "Column number_of_pedestrians_killed: coerced to int; missing(0) -> filled with 0",
+    "Column number_of_cyclist_injured: coerced to int; missing(0) -> filled with 0",
+    "Column number_of_cyclist_killed: coerced to int; missing(0) -> filled with 0",
+    "Column number_of_motorist_injured: coerced to int; missing(0) -> filled with 0",
+    "Column number_of_motorist_killed: coerced to int; missing(0) -> filled with 0",
+    "Parsed crash_date -> crash_date_parsed; missing after parse: 0",
+    "Parsed crash_time -> crash_time_parsed; missing after parse: 0",
+    "Column latitude: coerced to float; replaced 6580 zero values with NaN",
+    "Column longitude: coerced to float; replaced 6580 zero values with NaN",
+    "Standardized zip_code -> zip_code_std; invalid/empty: 681139",
+    "Standardized borough to uppercase in 'borough_std'"
+  ],
+  "start_rows": 2223272,
+  "missing_pct_before": {
+    "crash_date": 0.0,
+    "crash_time": 0.0,
+    "on_street_name": 0.21795218938573419,
+    "off_street_name": 0.3821304815605108,
+    "number_of_persons_injured": 8.096175366756744e-06,
+    "number_of_persons_killed": 1.3943413131636614e-05,
+    "number_of_pedestrians_injured": 0.0,
+    "number_of_pedestrians_killed": 0.0,
+    "number_of_cyclist_injured": 0.0,
+    "number_of_cyclist_killed": 0.0,
+    "number_of_motorist_injured": 0.0,
+    "number_of_motorist_killed": 0.0,
+    "contributing_factor_vehicle_1": 0.003538928210313448,
+    "contributing_factor_vehicle_2": 0.16066949972832834,
+    "collision_id": 0.0,
+    "vehicle_type_code1": 0.007283409317438442,
+    "vehicle_type_code2": 0.20079594399605627,
+    "borough": 0.3062243396219626,
+    "zip_code": 0.30634893076510655,
+    "latitude": 0.10812082372287332,
+    "longitude": 0.10812082372287332,
+    "location": 0.10812082372287332,
+    "contributing_factor_vehicle_3": 0.9276377339344893,
+    "vehicle_type_code_3": 0.9304502552993965,
+    "cross_street_name": 0.8235964830214206,
+    "contributing_factor_vehicle_4": 0.9834806537391736,
+    "vehicle_type_code_4": 0.9840797707163136,
+    "contributing_factor_vehicle_5": 0.9954728886074219,
+    "vehicle_type_code_5": 0.9956150214638605
+  },
+  "count_cols_detected": [
+    "number_of_persons_injured",
+    "number_of_persons_killed",
+    "number_of_pedestrians_injured",
+    "number_of_pedestrians_killed",
+    "number_of_cyclist_injured",
+    "number_of_cyclist_killed",
+    "number_of_motorist_injured",
+    "number_of_motorist_killed"
+  ],
+  "inconsistency_fixes": {
+    "injured_rows_fixed": 233,
+    "killed_rows_fixed": 6
+  },
+  "outliers": {
+    "number_of_persons_injured": {
+      "n_outliers": 539497,
+      "lower": 0.0,
+      "upper": 0.0,
+      "winsor_lower": 0.0,
+      "winsor_upper": 3.0
+    },
+    "number_of_persons_killed": {
+      "n_outliers": 3381,
+      "lower": 0.0,
+      "upper": 0.0,
+      "winsor_lower": 0.0,
+      "winsor_upper": 0.0
+    },
+    "number_of_pedestrians_injured": {
+      "n_outliers": 127216,
+      "lower": 0.0,
+      "upper": 0.0,
+      "winsor_lower": 0.0,
+      "winsor_upper": 1.0
+    },
+    "number_of_pedestrians_killed": {
+      "n_outliers": 1718,
+      "lower": 0.0,
+      "upper": 0.0,
+      "winsor_lower": 0.0,
+      "winsor_upper": 0.0
+    },
+    "number_of_cyclist_injured": {
+      "n_outliers": 64148,
+      "lower": 0.0,
+      "upper": 0.0,
+      "winsor_lower": 0.0,
+      "winsor_upper": 1.0
+    },
+    "number_of_cyclist_killed": {
+      "n_outliers": 279,
+      "lower": 0.0,
+      "upper": 0.0,
+      "winsor_lower": 0.0,
+      "winsor_upper": 0.0
+    },
+    "number_of_motorist_injured": {
+      "n_outliers": 341625,
+      "lower": 0.0,
+      "upper": 0.0,
+      "winsor_lower": 0.0,
+      "winsor_upper": 3.0
+    },
+    "number_of_motorist_killed": {
+      "n_outliers": 1322,
+      "lower": 0.0,
+      "upper": 0.0,
+      "winsor_lower": 0.0,
+      "winsor_upper": 0.0
+    }
+  },
+  "missing_pct_after": {
+    "crash_date": 0.0,
+    "crash_time": 0.0,
+    "on_street_name": 0.21795218938573419,
+    "off_street_name": 0.3821304815605108,
+    "number_of_persons_injured": 0.0,
+    "number_of_persons_killed": 0.0,
+    "number_of_pedestrians_injured": 0.0,
+    "number_of_pedestrians_killed": 0.0,
+    "number_of_cyclist_injured": 0.0,
+    "number_of_cyclist_killed": 0.0,
+    "number_of_motorist_injured": 0.0,
+    "number_of_motorist_killed": 0.0,
+    "contributing_factor_vehicle_1": 0.003538928210313448,
+    "contributing_factor_vehicle_2": 0.16066949972832834,
+    "collision_id": 0.0,
+    "vehicle_type_code1": 0.007283409317438442,
+    "vehicle_type_code2": 0.20079594399605627,
+    "borough": 0.3062243396219626,
+    "zip_code": 0.30634893076510655,
+    "latitude": 0.11108042560694328,
+    "longitude": 0.11108042560694328,
+    "location": 0.10812082372287332,
+    "contributing_factor_vehicle_3": 0.9276377339344893,
+    "vehicle_type_code_3": 0.9304502552993965,
+    "cross_street_name": 0.8235964830214206,
+    "contributing_factor_vehicle_4": 0.9834806537391736,
+    "vehicle_type_code_4": 0.9840797707163136,
+    "contributing_factor_vehicle_5": 0.9954728886074219,
+    "vehicle_type_code_5": 0.9956150214638605,
+    "crash_date_parsed": 0.0,
+    "crash_time_parsed": 0.0,
+    "zip_code_std": 0.30636782184096234,
+    "borough_std": 0.0
+  },
+  "rows_after_clean": 2223272
+}
