@@ -186,11 +186,10 @@ def main(limit: int = 5000, out_prefix: str = "cleaned"):
     df.to_csv(
         f"{out_prefix}.csv",
         index=False,
+        encoding='utf-8',
         quoting=csv.QUOTE_ALL,
-        escapechar="\\",
         quotechar='"',
-        line_terminator="\n",
-        on_bad_lines='skip'
+        escapechar='\\'
     )
 
     with open(f"{out_prefix}_log.json", "w", encoding="utf-8") as f:
