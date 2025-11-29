@@ -24,7 +24,15 @@ def download_data(limit: int = 1000) -> list:
     params = {"$limit": str(limit)}
     resp = requests.get(ENDPOINT, params=params, timeout=30)
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    try:
+        df = pd.DataFrame(data)
+        df.to_csv("raw_full.csv", index=False, encoding="utf-8")
+    except Exception:
+        # Fallback: write raw JSON into the CSV filename if CSV writing fails
+        with open("raw_full.csv", "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    return data
 
 def normalize_colnames(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()

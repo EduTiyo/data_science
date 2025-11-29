@@ -3,3 +3,4 @@ cleaned_logs.json
 data.csv
 logs.json
 raw_full.csv
+data/tidy/

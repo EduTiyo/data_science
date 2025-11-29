@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2025-11-27T23:02:23.442771Z",
+  "run_timestamp": "2025-11-29T14:52:28.044542Z",
   "source": "in-memory",
   "decisions": [
     "Normalized column names: strip, lower, spaces->underscore",
@@ -18,7 +18,7 @@
     "Standardized zip_code -> zip_code_std",
     "Standardized borough -> borough_std"
   ],
-  "start_rows": 2223272,
+  "start_rows": 2223742,
   "count_cols_detected": [
     "number_of_persons_injured",
     "number_of_persons_killed",
@@ -35,14 +35,14 @@
   },
   "outliers": {
     "number_of_persons_injured": {
-      "n_outliers": 539497,
+      "n_outliers": 539738,
       "lower": 0.0,
       "upper": 0.0,
       "winsor_lower": 0.0,
       "winsor_upper": 3.0
     },
     "number_of_persons_killed": {
-      "n_outliers": 3381,
+      "n_outliers": 3382,
       "lower": 0.0,
       "upper": 0.0,
       "winsor_lower": 0.0,
@@ -50,14 +50,14 @@
       "skipped": "quantile_range_zero"
     },
     "number_of_pedestrians_injured": {
-      "n_outliers": 127216,
+      "n_outliers": 127307,
       "lower": 0.0,
       "upper": 0.0,
       "winsor_lower": 0.0,
       "winsor_upper": 1.0
     },
     "number_of_pedestrians_killed": {
-      "n_outliers": 1718,
+      "n_outliers": 1719,
       "lower": 0.0,
       "upper": 0.0,
       "winsor_lower": 0.0,
@@ -65,7 +65,7 @@
       "skipped": "quantile_range_zero"
     },
     "number_of_cyclist_injured": {
-      "n_outliers": 64148,
+      "n_outliers": 64182,
       "lower": 0.0,
       "upper": 0.0,
       "winsor_lower": 0.0,
@@ -80,7 +80,7 @@
       "skipped": "quantile_range_zero"
     },
     "number_of_motorist_injured": {
-      "n_outliers": 341625,
+      "n_outliers": 341737,
       "lower": 0.0,
       "upper": 0.0,
       "winsor_lower": 0.0,
@@ -95,12 +95,12 @@
       "skipped": "quantile_range_zero"
     }
   },
-  "rows_after_clean": 2223272,
+  "rows_after_clean": 2223742,
   "missing_pct_after": {
     "crash_date": 0.0,
     "crash_time": 0.0,
-    "on_street_name": 0.21795218938573419,
-    "off_street_name": 0.3821304815605108,
+    "on_street_name": 0.2179681815606307,
+    "off_street_name": 0.38212841237877415,
     "number_of_persons_injured": 0.0,
     "number_of_persons_killed": 0.0,
     "number_of_pedestrians_injured": 0.0,
@@ -109,26 +109,26 @@
     "number_of_cyclist_killed": 0.0,
     "number_of_motorist_injured": 0.0,
     "number_of_motorist_killed": 0.0,
-    "contributing_factor_vehicle_1": 0.003538928210313448,
-    "contributing_factor_vehicle_2": 0.16066949972832834,
+    "contributing_factor_vehicle_1": 0.003540428700811515,
+    "contributing_factor_vehicle_2": 0.1607065927612106,
     "collision_id": 0.0,
-    "vehicle_type_code1": 0.007283409317438442,
-    "vehicle_type_code2": 0.20079594399605627,
-    "borough": 0.3062243396219626,
-    "zip_code": 0.30634893076510655,
-    "latitude": 0.11108042560694328,
-    "longitude": 0.11108042560694328,
-    "location": 0.10812082372287332,
-    "contributing_factor_vehicle_3": 0.9276377339344893,
-    "vehicle_type_code_3": 0.9304502552993965,
-    "cross_street_name": 0.8235964830214206,
-    "contributing_factor_vehicle_4": 0.9834806537391736,
-    "vehicle_type_code_4": 0.9840797707163136,
-    "contributing_factor_vehicle_5": 0.9954728886074219,
-    "vehicle_type_code_5": 0.9956150214638605,
+    "vehicle_type_code1": 0.007288165623530068,
+    "vehicle_type_code2": 0.20083894624466328,
+    "borough": 0.3062009891435247,
+    "zip_code": 0.3063255539536511,
+    "latitude": 0.11106234446262202,
+    "longitude": 0.11106234446262202,
+    "location": 0.1080984214895433,
+    "contributing_factor_vehicle_3": 0.9276422354751586,
+    "vehicle_type_code_3": 0.9304559611681571,
+    "cross_street_name": 0.8235717093080043,
+    "contributing_factor_vehicle_4": 0.9834827961157364,
+    "vehicle_type_code_4": 0.9840813367737804,
+    "contributing_factor_vehicle_5": 0.9954733957446502,
+    "vehicle_type_code_5": 0.9956150488680792,
     "crash_date_parsed": 0.0,
     "crash_time_parsed": 0.0,
-    "zip_code_std": 0.30636782184096234,
+    "zip_code_std": 0.30634444103677494,
     "borough_std": 0.0
   }
 }
